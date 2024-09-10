@@ -40,7 +40,7 @@ class Github:
             params={"page": 1, "per_page": 1})
         if last := response.links.get("last"):
             url = urlparse(last["url"])
-            return parse_qs(url.query)["page"][0]
+            return int(parse_qs(url.query)["page"][0])
         logger.warning("Could not get the nb of users %s follows", username)
         return 0
 
