@@ -45,7 +45,7 @@ class Github:
         return 0
 
     def get_followers(self) -> dict[str, Any]:
-        def paginate(next: str | None) -> dict[str, Any]:
+        def paginate(next: str) -> dict[str, Any]:
             response = self._make_request(HTTPMethod.GET, next)
             data.append(response.json())
             if next := response.links.get("next"):
