@@ -11,7 +11,8 @@ logger = getLogger(__name__)
 
 GH_USERNAME = getenv("GH_USERNAME")
 GH_TOKEN = getenv("GH_TOKEN")
-THRESHOLD = int(getenv("ANTIBOT_THRESHOLD"))
+THRESHOLD = int(getenv("ANTIBOT_THRESHOLD", 20_000))
+WHITELIST = getenv("ANTIBOT_WHITELIST", "")
 
 
 class Github:
@@ -47,7 +48,7 @@ class Github:
     def get_followers(self) -> dict[str, Any]:
         def paginate(next: str) -> dict[str, Any]:
             response = self._make_request(HTTPMethod.GET, next)
-            data.append(response.json())
+            data.extend(response.json())
             if next := response.links.get("next"):
                 return paginate(next)
             return data
@@ -59,9 +60,14 @@ class Github:
 
 
 def entrypoint() -> None:
+    if not GH_TOKEN:
+        raise RuntimeError("GH_TOKEN is mandatory")
     gh = Github()
+    whitelist = WHITELIST.replace(" ", "").split(",")
     for follower in gh.get_followers():
         username = follower["login"]
+        if username in whitelist:
+            continue
         nb_of_followings = gh.get_number_of_followings(username)
         if nb_of_followings >= THRESHOLD:
             logger.info("Blocking user %s which follows %s users", username,
