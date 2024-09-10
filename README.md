@@ -6,4 +6,4 @@ You will need to create a Github PAT token with the following permissions:
 - Read-only - Followers
 - Read and write - Block another user
 
-Then stick the PAT token value as a secret in your repository, under the name `GH_PAT`.
+Then stick the PAT token value as a secret in the repository containing this action, under the name `GH_PAT`.
