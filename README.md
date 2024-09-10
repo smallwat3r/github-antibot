@@ -9,5 +9,5 @@ You will need to create a **Github PAT token** with the following permissions:
 Then stick the PAT token value as a secret in the repository containing this action, under the name `GH_PAT`.
 
 The action supports two configurable parameters:
-- `ANTIBOT_THRESHOLD`: blocks any users that follow a number of users above this threshold, consider them as bot abusers
+- `ANTIBOT_THRESHOLD`: blocks any users with a following count above this threshold, consider them as bot abusers
 - `ANTIBOT_WHITELIST`: comma separated list of usernames to whitelist (do not block, even if above threshold)

@@ -22,11 +22,11 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
           GH_USERNAME: ${{ github.actor }}
-          # blocks any users that follow a number of users above this
+          # blocks any users with a follwing count above this
           # threshold, consider them as bot abusers.
           ANTIBOT_THRESHOLD: 20000
-          # comma separated list of usernames to whitelist (do not block
-          # even if above threshold)
+          # comma separated list of usernames to whitelist (do
+          # not block even if above threshold)
           ANTIBOT_WHITELIST: ''
         run: |
           python antibot.py
