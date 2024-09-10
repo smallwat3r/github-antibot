@@ -41,6 +41,7 @@ class Github:
         if last := response.links.get("last"):
             url = urlparse(last["url"])
             return parse_qs(url.query)["page"][0]
+        logger.warning("Could not get the nb of users %s follows", username)
         return 0
 
     def get_followers(self) -> dict[str, Any]:
