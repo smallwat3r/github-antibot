@@ -11,3 +11,5 @@ Then stick the PAT token value as a secret in the repository containing this act
 The action supports two configurable parameters:
 - `ANTIBOT_THRESHOLD`: blocks any users with a following count above this threshold, consider them as bot abusers
 - `ANTIBOT_WHITELIST`: comma separated list of usernames to whitelist (do not block, even if above threshold)
+
+Todo list: tests
