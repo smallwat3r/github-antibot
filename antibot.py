@@ -1,9 +1,8 @@
-from os import getenv
-from logging import getLogger
-from typing import Any
-from urllib.parse import urljoin
 from http import HTTPMethod
-from urllib.parse import parse_qs, urlparse
+from logging import getLogger
+from os import getenv
+from typing import Any
+from urllib.parse import parse_qs, urljoin, urlparse
 
 import requests
 from requests import Response
