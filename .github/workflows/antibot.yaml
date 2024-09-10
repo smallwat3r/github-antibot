@@ -1,7 +1,9 @@
 name: 'Antibot'
+
 on:
   schedule:
   - cron: '0 0 * * *'
+
 jobs:
   antibot:
     runs-on: ubuntu-latest
