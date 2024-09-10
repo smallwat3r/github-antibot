@@ -70,7 +70,7 @@ def entrypoint() -> None:
             continue
         nb_of_followings = gh.get_number_of_followings(username)
         if nb_of_followings >= THRESHOLD:
-            logger.warning("Blocking user %s which follows %s users",
+            logger.warning("Blocking user %s who follows %s users",
                            username, nb_of_followings)
             gh.block_user(username)
 
