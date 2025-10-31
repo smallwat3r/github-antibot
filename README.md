@@ -25,6 +25,6 @@ The action supports the following environment variables for configuration:
 - `ANTIBOT_THRESHOLD`: The number of people a user must be following to be considered a bot (default: `20000`).
 - `ANTIBOT_WHITELIST`: A comma-separated list of usernames to exclude from blocking, even if they exceed the threshold.
 
-**Note:** The application also enforces a concurrent request limit of 100 to comply with GitHub's API restrictions.
+**Note:** The application also enforces a concurrent request limit of 50 to comply with GitHub's API restrictions (<100).
 
 GitHub Actions may stop running scheduled workflows for inactive repositories. To prevent this, each pipeline run updates the `.keep_alive` file with a new UUID and commits the change, ensuring continued activity and keeping the workflow alive over time.
