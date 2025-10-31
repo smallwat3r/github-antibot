@@ -15,10 +15,9 @@ func setup() (server *httptest.Server, mux *http.ServeMux, teardown func()) {
 	server = httptest.NewServer(mux)
 
 	baseURL = server.URL
+	config.ConcurrentRequestsSemaphore = make(chan struct{}, 50)
 	teardown = func() {
 		server.Close()
-		// reset baseURL
-		baseURL = "https://api.github.com"
 	}
 	return
 }
@@ -52,6 +51,8 @@ func TestLoadConfig(t *testing.T) {
 			Whitelist: map[string]struct{}{"user1": {}, "user2": {}},
 		}
 
+		// ignore ConcurrentRequestsSemaphore for comparison
+		config.ConcurrentRequestsSemaphore = nil
 		if !reflect.DeepEqual(config, expected) {
 			t.Errorf("loadConfig() = %+v, want %+v", config, expected)
 		}
@@ -80,6 +81,7 @@ func TestRequest(t *testing.T) {
 
 	config.Username = "testuser"
 	config.PAT = "testpat"
+	config.ConcurrentRequestsSemaphore = make(chan struct{}, 50)
 
 	mux.HandleFunc("/test-endpoint", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "GET" {
@@ -105,7 +107,7 @@ func TestRequest(t *testing.T) {
 	})
 
 	t.Run("successful request", func(t *testing.T) {
-		resp, err := request("GET", "/test-endpoint", "")
+		resp, err := request("GET", "/test-endpoint")
 		if err != nil {
 			t.Fatalf("request() returned error: %v", err)
 		}
@@ -116,7 +118,7 @@ func TestRequest(t *testing.T) {
 	})
 
 	t.Run("failed request", func(t *testing.T) {
-		_, err := request("GET", "/test-error", "")
+		_, err := request("GET", "/test-error")
 		if err == nil {
 			t.Fatal("request() did not return error for failed request")
 		}
@@ -132,7 +134,11 @@ func TestRequest(t *testing.T) {
 			fmt.Fprint(w, "ok from custom")
 		})
 
-		resp, err := request("GET", "/custom-endpoint", server2.URL)
+		originalBaseURL := baseURL
+		baseURL = server2.URL
+		defer func() { baseURL = originalBaseURL }()
+
+		resp, err := request("GET", "/custom-endpoint")
 		if err != nil {
 			t.Fatalf("request() with custom URL returned error: %v", err)
 		}
@@ -150,6 +156,7 @@ func TestGetFollowers(t *testing.T) {
 
 	config.Username = "testuser"
 	config.PAT = "testpat"
+	config.ConcurrentRequestsSemaphore = make(chan struct{}, 50)
 
 	mux.HandleFunc("/users/testuser/followers", func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
@@ -180,6 +187,8 @@ func TestGetFollowingCount(t *testing.T) {
 	_, mux, teardown := setup()
 	defer teardown()
 
+	config.ConcurrentRequestsSemaphore = make(chan struct{}, 50)
+
 	mux.HandleFunc("/users/testuser", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, `{"login": "testuser", "following": 42}`)
 	})
@@ -197,6 +206,8 @@ func TestGetFollowingCount(t *testing.T) {
 func TestBlockUser(t *testing.T) {
 	_, mux, teardown := setup()
 	defer teardown()
+
+	config.ConcurrentRequestsSemaphore = make(chan struct{}, 50)
 
 	mux.HandleFunc("/user/blocks/baduser", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPut {
@@ -216,14 +227,15 @@ func TestProcessFollowers(t *testing.T) {
 	defer teardown()
 
 	config = Config{
-		Username:  "testuser",
-		PAT:       "testpat",
-		Threshold: 100,
-		Whitelist: map[string]struct{}{"gooduser": {}},
+		Username:                    "testuser",
+		PAT:                         "testpat",
+		Threshold:                   100,
+		Whitelist:                   map[string]struct{}{"gooduser": {}},
+		ConcurrentRequestsSemaphore: make(chan struct{}, 50),
 	}
 	baseURL = server.URL
 
-	var blockedUsers []string
+	blockedUsersChan := make(chan string, 3)
 
 	// mock for getFollowingCount
 	mux.HandleFunc("/users/highfollowing", func(w http.ResponseWriter, r *http.Request) {
@@ -238,7 +250,7 @@ func TestProcessFollowers(t *testing.T) {
 
 	// mock for blockUser
 	mux.HandleFunc("/user/blocks/highfollowing", func(w http.ResponseWriter, r *http.Request) {
-		blockedUsers = append(blockedUsers, "highfollowing")
+		blockedUsersChan <- "highfollowing"
 		w.WriteHeader(http.StatusNoContent)
 	})
 	mux.HandleFunc("/user/blocks/lowfollowing", func(w http.ResponseWriter, r *http.Request) {
@@ -253,6 +265,13 @@ func TestProcessFollowers(t *testing.T) {
 	}
 
 	processFollowers(followers)
+
+	close(blockedUsersChan)
+
+	var blockedUsers []string
+	for user := range blockedUsersChan {
+		blockedUsers = append(blockedUsers, user)
+	}
 
 	expectedBlocked := []string{"highfollowing"}
 	if !reflect.DeepEqual(blockedUsers, expectedBlocked) {

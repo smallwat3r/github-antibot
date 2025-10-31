@@ -16,8 +16,15 @@ To use this action, you'll need to create a [**Github PAT token**](https://githu
 
 Add this token as a repository secret named `GH_PAT`.
 
-The action supports two configurable parameters:
-- `ANTIBOT_THRESHOLD`: Number of people a user must be following to be considered a bot (default: 20000)
-- `ANTIBOT_WHITELIST`: Comma-separated list of usernames to exclude from blocking, even if they exceed the threshold
+## Configuration
+
+The action supports the following environment variables for configuration:
+
+- `GH_USERNAME`: **Required.** Your GitHub username.
+- `GH_PAT`: **Required.** Your GitHub Personal Access Token.
+- `ANTIBOT_THRESHOLD`: The number of people a user must be following to be considered a bot (default: `20000`).
+- `ANTIBOT_WHITELIST`: A comma-separated list of usernames to exclude from blocking, even if they exceed the threshold.
+
+**Note:** The application also enforces a concurrent request limit of 100 to comply with GitHub's API restrictions.
 
 GitHub Actions may stop running scheduled workflows for inactive repositories. To prevent this, each pipeline run updates the `.keep_alive` file with a new UUID and commits the change, ensuring continued activity and keeping the workflow alive over time.

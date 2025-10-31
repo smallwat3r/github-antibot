@@ -10,6 +10,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -18,10 +19,11 @@ var (
 )
 
 type Config struct {
-	Username  string
-	PAT       string
-	Threshold int
-	Whitelist map[string]struct{}
+	Username                    string
+	PAT                         string
+	Threshold                   int
+	Whitelist                   map[string]struct{}
+	ConcurrentRequestsSemaphore chan struct{}
 }
 
 var config Config
@@ -61,22 +63,21 @@ func loadConfig() {
 	}
 
 	config = Config{
-		Username:  ghUsername,
-		PAT:       ghPat,
-		Threshold: antibotThreshold,
-		Whitelist: antibotWhitelist,
+		Username:                    ghUsername,
+		PAT:                         ghPat,
+		Threshold:                   antibotThreshold,
+		Whitelist:                   antibotWhitelist,
+		ConcurrentRequestsSemaphore: make(chan struct{}, 50),
 	}
 }
 
-func request(method, endpoint, customBaseURL string) (*http.Response, error) {
+func request(method, endpoint string) (*http.Response, error) {
+	config.ConcurrentRequestsSemaphore <- struct{}{}
+	defer func() { <-config.ConcurrentRequestsSemaphore }()
+
 	client := &http.Client{Timeout: time.Second * 10}
 
-	var fullURL string
-	if customBaseURL != "" {
-		fullURL = customBaseURL + endpoint
-	} else {
-		fullURL = baseURL + endpoint
-	}
+	fullURL := baseURL + endpoint
 
 	req, err := http.NewRequest(method, fullURL, nil)
 	if err != nil {
@@ -102,13 +103,12 @@ func request(method, endpoint, customBaseURL string) (*http.Response, error) {
 	return resp, nil
 }
 
-// fetches all followers for the user.
 func getFollowers() ([]User, error) {
 	var followers []User
 	endpoint := fmt.Sprintf("/users/%s/followers?per_page=100", config.Username)
 
 	for endpoint != "" {
-		resp, err := request("GET", endpoint, "")
+		resp, err := request("GET", endpoint)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get followers page: %w", err)
 		}
@@ -122,30 +122,31 @@ func getFollowers() ([]User, error) {
 
 		linkHeader := resp.Header.Get("Link")
 		endpoint = "" // reset for next iteration
-		if linkHeader != "" {
-			links := strings.Split(linkHeader, ",")
-			for _, link := range links {
-				if strings.Contains(link, `rel="next"`) {
-					parts := strings.Split(link, ";")
-					nextURLStr := strings.Trim(parts[0], "<> ")
-					nextURL, err := url.Parse(nextURLStr)
-					if err != nil {
-						log.Printf("Warning: failed to parse next page URL: %v", err)
-						continue
-					}
-					endpoint = nextURL.RequestURI()
-					break
+		if linkHeader == "" {
+			continue
+		}
+
+		links := strings.Split(linkHeader, ",")
+		for _, link := range links {
+			if strings.Contains(link, `rel="next"`) {
+				parts := strings.Split(link, ";")
+				nextURLStr := strings.Trim(parts[0], "<> ")
+				nextURL, err := url.Parse(nextURLStr)
+				if err != nil {
+					log.Printf("Warning: failed to parse next page URL: %v", err)
+					continue
 				}
+				endpoint = nextURL.RequestURI()
+				break
 			}
 		}
 	}
 	return followers, nil
 }
 
-// fetches the following count for a user.
 func getFollowingCount(username string) (int, error) {
 	endpoint := fmt.Sprintf("/users/%s", username)
-	resp, err := request("GET", endpoint, "")
+	resp, err := request("GET", endpoint)
 	if err != nil {
 		return 0, fmt.Errorf("failed to get user details for %s: %w", username, err)
 	}
@@ -158,10 +159,9 @@ func getFollowingCount(username string) (int, error) {
 	return user.Following, nil
 }
 
-// blocks a user.
 func blockUser(username string) error {
 	endpoint := fmt.Sprintf("/user/blocks/%s", username)
-	resp, err := request("PUT", endpoint, "")
+	resp, err := request("PUT", endpoint)
 	if err != nil {
 		return fmt.Errorf("failed to block user %s: %w", username, err)
 	}
@@ -171,9 +171,35 @@ func blockUser(username string) error {
 }
 
 func processFollowers(followers []User) {
-	blockedCount := 0
+	var wg sync.WaitGroup
+	jobs := make(chan string, len(followers))
+	results := make(chan bool, len(followers))
+
+	numWorkers := 50
+	for w := 1; w <= numWorkers; w++ {
+		wg.Add(1)
+		go worker(&wg, jobs, results)
+	}
+
 	for _, follower := range followers {
-		username := follower.Login
+		jobs <- follower.Login
+	}
+	close(jobs)
+
+	wg.Wait()
+	close(results)
+
+	blockedCount := 0
+	for range results {
+		blockedCount++
+	}
+
+	log.Printf("Finished. Blocked %d users.", blockedCount)
+}
+
+func worker(wg *sync.WaitGroup, jobs <-chan string, results chan<- bool) {
+	defer wg.Done()
+	for username := range jobs {
 		if _, isWhitelisted := config.Whitelist[username]; isWhitelisted {
 			log.Printf("Skipping whitelisted user: %s", username)
 			continue
@@ -191,11 +217,10 @@ func processFollowers(followers []User) {
 			if err := blockUser(username); err != nil {
 				log.Printf("Failed to block user %s: %v", username, err)
 			} else {
-				blockedCount++
+				results <- true
 			}
 		}
 	}
-	log.Printf("Finished. Blocked %d users.", blockedCount)
 }
 
 func main() {
