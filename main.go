@@ -33,16 +33,13 @@ type User struct {
 	Following int    `json:"following"`
 }
 
-func loadConfig() {
-	ghUsername := os.Getenv("GH_USERNAME")
+func parseConfig(ghUsername, ghPat, thresholdStr, whitelistStr string) (Config, error) {
 	if ghUsername == "" {
-		log.Fatal("GH_USERNAME environment variable is required.")
+		return Config{}, fmt.Errorf("GH_USERNAME environment variable is required")
 	}
-	ghPat := os.Getenv("GH_PAT")
 	if ghPat == "" {
-		log.Fatal("GH_PAT environment variable is required.")
+		return Config{}, fmt.Errorf("GH_PAT environment variable is required")
 	}
-	thresholdStr := os.Getenv("ANTIBOT_THRESHOLD")
 	if thresholdStr == "" {
 		thresholdStr = "20000"
 	}
@@ -52,7 +49,6 @@ func loadConfig() {
 		antibotThreshold = 20000
 	}
 
-	whitelistStr := os.Getenv("ANTIBOT_WHITELIST")
 	whitelistItems := strings.Split(whitelistStr, ",")
 	antibotWhitelist := make(map[string]struct{})
 	for _, item := range whitelistItems {
@@ -62,12 +58,25 @@ func loadConfig() {
 		}
 	}
 
-	config = Config{
+	return Config{
 		Username:                    ghUsername,
 		PAT:                         ghPat,
 		Threshold:                   antibotThreshold,
 		Whitelist:                   antibotWhitelist,
 		ConcurrentRequestsSemaphore: make(chan struct{}, 50),
+	}, nil
+}
+
+func loadConfig() {
+	ghUsername := os.Getenv("GH_USERNAME")
+	ghPat := os.Getenv("GH_PAT")
+	thresholdStr := os.Getenv("ANTIBOT_THRESHOLD")
+	whitelistStr := os.Getenv("ANTIBOT_WHITELIST")
+
+	var err error
+	config, err = parseConfig(ghUsername, ghPat, thresholdStr, whitelistStr)
+	if err != nil {
+		log.Fatal(err)
 	}
 }
 
