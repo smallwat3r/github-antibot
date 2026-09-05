@@ -26,7 +26,7 @@ The action will run automatically every day at midnight UTC. You can also trigge
 
 The action [antibot.yaml](./.github/workflows/antibot.yaml) is configured using environment variables:
 
-- `GH_PAT`: **Required.** A GitHub Personal Access Token with the necessary permissions to block users and write to the repository. See [PAT Configuration](#pat-configuration) for details.
+- `GH_PAT`: **Required.** A GitHub Personal Access Token with the necessary permissions to read followers and block users. See [PAT Configuration](#pat-configuration) for details.
 - `ANTIBOT_THRESHOLD`: The number of accounts a user must be following to be considered a bot. Defaults to `20000`.
 - `ANTIBOT_WHITELIST`: A comma-separated list of usernames to exclude from blocking, even if they exceed the threshold.
 
@@ -36,8 +36,6 @@ The action [antibot.yaml](./.github/workflows/antibot.yaml) is configured using 
 
 You need to create a [GitHub Personal Access Token](https://github.com/settings/personal-access-tokens) with the following permissions:
 
-- **Repository permissions:**
-  - `Contents`: Read and write (to update the `.keep_alive` file)
 - **Account permissions:**
   - `Blocking users`: Read and write
   - `Followers`: Read-only
@@ -59,4 +57,4 @@ When the action runs, you'll see output like this in the workflow logs:
 
 ## Keep-Alive Mechanism
 
-GitHub Actions may disable scheduled workflows on inactive repositories. To prevent this, the action updates a `.keep_alive` file with a new timestamp in each run. This small commit ensures the repository remains active, keeping the daily scans running.
+GitHub disables scheduled workflows after 60 days without repository activity. To prevent this, each run re-enables the workflow through the GitHub API, which resets that timer without creating a commit. This uses the workflow's own `GITHUB_TOKEN` with `actions: write`, no extra PAT permission is needed.

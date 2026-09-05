@@ -5,31 +5,34 @@ on:
   schedule:
     - cron: '0 0 * * *'
 
+concurrency: antibot
+
 jobs:
   antibot:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
-      contents: write
+      actions: write
     steps:
       - uses: actions/checkout@v6
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
-          go-version: '1.24'
-      - name: Tidy dependencies
-        run: go mod tidy
+          go-version-file: go.mod
       - name: Block bot abusers
         env:
           GH_PAT: ${{ secrets.GH_PAT }}
           GH_USERNAME: ${{ github.actor }}
-          # blocks any users with a follwing count above this
+          # blocks any users with a following count above this
           # threshold, consider them as bot abusers.
           ANTIBOT_THRESHOLD: 20000
           # comma separated list of usernames to whitelist (do
           # not block even if above threshold)
           ANTIBOT_WHITELIST: ''
-        run: go run main.go && uuidgen > .keep_alive
-      - uses: stefanzweifel/git-auto-commit-action@v7
-        with:
-          commit_message: Keep alive
-          commit_author: github-actions[bot] <github-actions[bot]@users.noreply.github.com>
+        run: go run main.go
+      # GitHub disables scheduled workflows after 60 days without
+      # activity, re-enabling the workflow resets that timer.
+      - name: Keep alive
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PUT repos/${{ github.repository }}/actions/workflows/antibot.yaml/enable
