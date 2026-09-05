@@ -7,7 +7,7 @@ help:  ## Show this help menu
 
 .PHONY: build
 build: ## Build the Go application
-	go build -o antibot main.go
+	go build -o github-antibot main.go
 
 .PHONY: run
 run: ## Run the Go application
