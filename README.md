@@ -5,8 +5,8 @@ Tired of spammy notifications from mass-following bot accounts? This GitHub Acti
 ## How It Works
 
 1. The action runs daily (or on-demand via workflow dispatch)
-2. Fetches your current list of followers
-3. For each follower, checks how many accounts they are following
+2. Fetches your followers along with how many accounts each of them follows, in a single GraphQL query per 100 followers
+3. Compares each following count against the threshold
 4. If that count exceeds the threshold (default: 20,000), the user is blocked
 5. Whitelisted users are skipped regardless of their following count
 
@@ -28,7 +28,7 @@ The action [antibot.yaml](./.github/workflows/antibot.yaml) is configured using 
 
 - `GH_PAT`: **Required.** A GitHub Personal Access Token with the necessary permissions to read followers and block users. See [PAT Configuration](#pat-configuration) for details.
 - `ANTIBOT_THRESHOLD`: The number of accounts a user must be following to be considered a bot. Defaults to `20000`.
-- `ANTIBOT_WHITELIST`: A comma-separated list of usernames to exclude from blocking, even if they exceed the threshold.
+- `ANTIBOT_WHITELIST`: A comma-separated list of usernames to exclude from blocking, even if they exceed the threshold. Case insensitive.
 
 **Note:** The `GH_USERNAME` is automatically determined from the user running the action (`github.actor`).
 
@@ -47,12 +47,12 @@ Once created, add the token *as a repository secret* named `GH_PAT`. For instruc
 When the action runs, you'll see output like this in the workflow logs:
 
 ```
-2024/01/15 00:00:01 main.go:282: fetching followers for your-username...
-2024/01/15 00:00:02 main.go:287: found 150 followers
-2024/01/15 00:00:03 main.go:231: skip whitelisted: trusted-user
-2024/01/15 00:00:04 main.go:243: blocking spam-bot-123: following 45000 >= threshold 20000
-2024/01/15 00:00:05 main.go:243: blocking mass-follower: following 32000 >= threshold 20000
-2024/01/15 00:00:06 main.go:290: finished. blocked 2 users.
+2024/01/15 00:00:01 fetching followers for your-username...
+2024/01/15 00:00:02 found 150 followers
+2024/01/15 00:00:03 skip whitelisted: trusted-user
+2024/01/15 00:00:04 blocking spam-bot-123: following 45000 >= threshold 20000
+2024/01/15 00:00:05 blocking mass-follower: following 32000 >= threshold 20000
+2024/01/15 00:00:06 finished. blocked 2 users.
 ```
 
 ## Keep-Alive Mechanism
