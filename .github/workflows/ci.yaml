@@ -14,9 +14,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
-          go-version: '1.24'
-      - name: Tidy dependencies
-        run: go mod tidy
+          go-version-file: go.mod
       - name: Run tests
         run: go test -race ./...
       - name: Build
